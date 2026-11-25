@@ -1,0 +1,7 @@
+llama-index-core
+llama-index-llms-openai-like
+llama-index-embeddings-openai-like
+pymupdf
+fastapi
+uvicorn
+python-dotenv
