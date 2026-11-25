@@ -4,6 +4,7 @@ import os
 
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,7 @@ ChatModel = Literal[
 
 # Request schema
 class ChatRequest(BaseModel):
+    conversation_id: str | None = None
     question: str = Field(
         min_length=3,
         max_length=5000
@@ -111,9 +113,23 @@ def chat_stream(request: ChatRequest):
             detail="Vector index not found. Run ingestion first."
         )
 
+    # Reuse existing ID or generate one for a new conversation
+    conversation_id = str(
+        request.conversation_id or uuid4()
+    )
+
     def event_stream():
+
+        # Send conversation ID immediately, before generating tokens
+        payload = json.dumps({
+            "type": "conversation",
+            "conversation_id": conversation_id,
+        })
+        yield f"data: {payload}\n\n"
+        
         try:
             for event in ask_stream(
+                conversation_id=conversation_id,
                 question=request.question,
                 model_name=request.model
             ):
