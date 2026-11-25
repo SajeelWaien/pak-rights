@@ -25,7 +25,7 @@ COPY . .
 RUN mkdir -p storage/vector_index
 
 # Declare a volume so the vector store can be persisted on the host
-VOLUME ["/app/storage/vector_index"]
+VOLUME ["/app/storage"]
 
 # Expose the port that uvicorn will run on
 EXPOSE 8000

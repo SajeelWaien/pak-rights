@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.memory import get_memory
 from app.rag import ask, ask_stream
 
 
@@ -152,3 +153,40 @@ def chat_stream(request: ChatRequest):
             "X-Accel-Buffering": "no"
         }
     )
+
+@app.get("/conversations/{conversation_id}/messages")
+async def get_conversation_history(conversation_id: str):
+
+    memory = get_memory(conversation_id)
+
+    exists = await memory.sql_store.count_messages(
+        conversation_id, status=None
+    ) > 0
+
+    if not exists:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No conversation found with ID: {conversation_id}"
+        )
+
+    history = await memory.aget_all()
+
+    messages = []
+
+    for message in history:
+
+        role = message.role.value
+
+        # Only return messages visible in the chat UI
+        if role not in ["user", "assistant"]:
+            continue
+
+        messages.append({
+            "role": role,
+            "content": message.content or ""
+        })
+
+    return {
+        "conversation_id": conversation_id,
+        "messages": messages
+    }
