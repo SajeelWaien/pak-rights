@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from app.memory import get_memory
 from app.rag import ask, ask_stream
+from app.whatsapp_wh import router as whatsapp_router
 
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ app = FastAPI(
     description="Legal information assistant powered by Paranine and LlamaIndex",
     version="0.1.0"
 )
+app.include_router(whatsapp_router)
 
 
 # Allow your Next.js frontend to communicate with FastAPI
