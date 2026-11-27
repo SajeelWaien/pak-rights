@@ -20,6 +20,34 @@ from app.config import (
 STORAGE_DIR = Path("./storage/vector_index")
 _INDEX = None
 
+CHAT_SYSTEM_PROMPT = """
+You are a legal assistant specializing in Pakistani law.
+
+Answer in understandable English.
+
+Use retrieved legal documents as your primary source of legal authority.
+Use conversation history to understand follow-up questions and the user's situation.
+Never invent legal provisions or citations.
+Clearly identify uncertainty.
+
+WhatsApp client context:
+- Describe retrieved passages as information available to you, not as material the client supplied.
+- When information is missing, say "The information I have does not contain..." or "The available information does not specify...".
+- Do not say "the excerpts you provided", "the documents you uploaded", or similar wording unless the client explicitly said they supplied those materials.
+- Treat the person asking as a client using a shared legal information service.
+- Do not assume retrieved legal documents belong to, were uploaded by, or are personal to the client.
+- Refer to retrieved documents by their source title or neutrally; call a document the client's only if they explicitly say it is theirs.
+"""
+
+WHATSAPP_SYSTEM_INSTRUCTIONS = """
+WhatsApp response formatting:
+- Use plain text. Do not use Markdown formatting, tables, headings, code fences, or Markdown links.
+- If information is tabular, convert each row into a clear list item with labels for its values.
+- Use short paragraphs or simple numbered or bulleted lists when they make the answer easier to read.
+- Preserve relevant details, relationships, legal qualifications, and citations.
+- Keep source names and page references as readable plain text.
+"""
+
 
 SYSTEM_PROMPT = """
 You are a legal information assistant specializing in Pakistani law.
@@ -109,7 +137,12 @@ def create_query_engine(model_name, streaming=False):
     return query_engine
 
 
-def create_chat_engine(conversation_id, model_name, streaming=False):
+def create_chat_engine(
+    conversation_id,
+    model_name,
+    streaming=False,
+    whatsapp_format=False
+):
 
     print(f"Creating chat engine for model={model_name}", flush=True)
     index = initialize_index()
@@ -118,6 +151,9 @@ def create_chat_engine(conversation_id, model_name, streaming=False):
     prompt = PromptTemplate(SYSTEM_PROMPT)
 
     memory = get_memory(conversation_id)
+    system_prompt = CHAT_SYSTEM_PROMPT
+    if whatsapp_format:
+        system_prompt += WHATSAPP_SYSTEM_INSTRUCTIONS
 
     chat_engine = index.as_chat_engine(
         chat_mode="condense_plus_context",
@@ -125,21 +161,7 @@ def create_chat_engine(conversation_id, model_name, streaming=False):
         memory=memory,
         similarity_top_k=5,
         streaming=streaming,
-        system_prompt="""
-        You are a legal assistant specializing
-        in Pakistani law.
-
-        Answer in understandable English.
-
-        Use retrieved legal documents as your
-        primary source of legal authority.
-
-        Use conversation history to understand
-        follow-up questions and the user's situation.
-
-        Never invent legal provisions or citations.
-        Clearly identify uncertainty.
-        """
+        system_prompt=system_prompt
     )
 
     return chat_engine
@@ -182,9 +204,19 @@ def ask(question, model_name="paranine/gpt-oss-120b(high)"):
     }
 
 
-def ask_stream(conversation_id, question, model_name="paranine/gpt-oss-120b(high)"):
+def ask_stream(
+    conversation_id,
+    question,
+    model_name="paranine/gpt-oss-120b(high)",
+    whatsapp_format=False
+):
 
-    chat_engine = create_chat_engine(conversation_id=conversation_id, model_name=model_name, streaming=True)
+    chat_engine = create_chat_engine(
+        conversation_id=conversation_id,
+        model_name=model_name,
+        streaming=True,
+        whatsapp_format=whatsapp_format
+    )
 
     response = chat_engine.stream_chat(question)
 

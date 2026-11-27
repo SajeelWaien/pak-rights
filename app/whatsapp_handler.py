@@ -59,7 +59,8 @@ def process_whatsapp_message(
         for event in ask_stream(
             question=question,
             model_name=DEFAULT_MODEL,
-            conversation_id=conversation_id
+            conversation_id=conversation_id,
+            whatsapp_format=True
         ):
 
             if event.get("type") == "token":
