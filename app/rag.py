@@ -1,3 +1,5 @@
+from asyncio.log import logger
+
 from llama_index.core import (
     Settings,
     StorageContext,
@@ -72,6 +74,8 @@ def create_query_engine(model_name, streaming=False):
 
 
 def create_chat_engine(conversation_id, model_name, streaming=False):
+
+    print(f"Creating chat engine for conversation_id=%s, model_name=%s", conversation_id, model_name)
 
     Settings.embed_model = get_embedding_model()
 
