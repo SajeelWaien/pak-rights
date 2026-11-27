@@ -2,6 +2,7 @@ import json
 import logging
 import os
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
@@ -12,7 +13,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.memory import get_memory
-from app.rag import ask, ask_stream
+from app.rag import ask, ask_stream, initialize_index
 from app.whatsapp_wh import router as whatsapp_router
 
 
@@ -50,10 +51,17 @@ class ChatResponse(BaseModel):
     sources: list[Source]
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    initialize_index()
+    yield
+
+
 app = FastAPI(
     title="Pakistan Legal RAG API",
     description="Legal information assistant powered by Paranine and LlamaIndex",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan
 )
 app.include_router(whatsapp_router)
 

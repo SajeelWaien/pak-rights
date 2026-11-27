@@ -1,4 +1,6 @@
 from asyncio.log import logger
+import time
+from pathlib import Path
 
 from llama_index.core import (
     Settings,
@@ -15,7 +17,8 @@ from app.config import (
 )
 
 
-STORAGE_DIR = "./storage/vector_index"
+STORAGE_DIR = Path("./storage/vector_index")
+_INDEX = None
 
 
 SYSTEM_PROMPT = """
@@ -45,21 +48,54 @@ Question:
 Answer:
 """
 
-def create_query_engine(model_name, streaming=False):
+
+def initialize_index():
+    global _INDEX
+
+    if _INDEX is not None:
+        return _INDEX
 
     Settings.embed_model = get_embedding_model()
+    docstore_path = STORAGE_DIR / "docstore.json"
 
-    llm = get_llm(model_name)
-
-    from pathlib import Path
-    # If the persisted index exists, load it; otherwise run ingestion to build it.
-    if (Path(STORAGE_DIR) / "docstore.json").exists():
-        storage_context = StorageContext.from_defaults(persist_dir=STORAGE_DIR)
+    if docstore_path.exists():
+        index_size = sum(
+            path.stat().st_size
+            for path in STORAGE_DIR.iterdir()
+            if path.is_file()
+        )
+        print(
+            f"Loading persisted vector index "
+            f"({index_size / (1024 * 1024):.1f} MiB)",
+            flush=True,
+        )
+        started_at = time.perf_counter()
+        storage_context = StorageContext.from_defaults(
+            persist_dir=str(STORAGE_DIR)
+        )
         index = load_index_from_storage(storage_context)
+        print(
+            f"Persisted vector index loaded in "
+            f"{time.perf_counter() - started_at:.1f} seconds",
+            flush=True,
+        )
     else:
-        # No index yet – ingest PDFs from the data directory.
+        print(
+            "Persisted vector index not found; building it from source documents",
+            flush=True,
+        )
         from app.ingestion import ingest_documents
+
         index = ingest_documents()
+
+    _INDEX = index
+    return _INDEX
+
+
+def create_query_engine(model_name, streaming=False):
+
+    index = initialize_index()
+    llm = get_llm(model_name)
 
     prompt = PromptTemplate(SYSTEM_PROMPT)
 
@@ -75,21 +111,9 @@ def create_query_engine(model_name, streaming=False):
 
 def create_chat_engine(conversation_id, model_name, streaming=False):
 
-    print(f"Creating chat engine for conversation_id=%s, model_name=%s", conversation_id, model_name)
-
-    Settings.embed_model = get_embedding_model()
-
+    print(f"Creating chat engine for model={model_name}", flush=True)
+    index = initialize_index()
     llm = get_llm(model_name)
-
-    from pathlib import Path
-    # If the persisted index exists, load it; otherwise run ingestion to build it.
-    if (Path(STORAGE_DIR) / "docstore.json").exists():
-        storage_context = StorageContext.from_defaults(persist_dir=STORAGE_DIR)
-        index = load_index_from_storage(storage_context)
-    else:
-        # No index yet – ingest PDFs from the data directory.
-        from app.ingestion import ingest_documents
-        index = ingest_documents()
 
     prompt = PromptTemplate(SYSTEM_PROMPT)
 
